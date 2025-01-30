@@ -4,46 +4,39 @@
     <title>俄罗斯方块</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
+        /* 极简布局，确保无冲突 */
         body { 
             background: #333; 
-            margin: 0; 
-            touch-action: none;
+            margin: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
-            font-family: Arial, sans-serif;
+            touch-action: none;
+        }
+        #game {
+            border: 2px solid #666;
+            margin-top: 20px;
         }
         #score {
             color: white;
             font-size: 20px;
             padding: 10px;
         }
-        #game {
-            border: 2px solid white;
-        }
         #controls {
             margin-top: 20px;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            width: 300px;
+            display: flex;
+            gap: 20px;
         }
         .btn {
-            width: 60px;
-            height: 60px;
-            background: rgba(255,255,255,0.3);
-            border-radius: 50%;
+            width: 70px;
+            height: 70px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 15px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 24px;
-            user-select: none;
-            touch-action: none;
-        }
-        #down {
-            grid-column: 2; /* 将下键放在中间 */
-            margin-top: -30px; /* 上移下键 */
+            font-size: 30px;
         }
     </style>
 </head>
@@ -80,7 +73,7 @@
         let board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
         let current = null, x = 0, y = 0;
 
-        // █████████████████████ 游戏循环 █████████████████████
+        // █████████████████████ 确保游戏循环 █████████████████████
         function update() {
             y++;
             if (collision()) {
@@ -88,18 +81,14 @@
                 merge();
             }
             draw();
-            gameLoop = setTimeout(update, 1000);
+            gameLoop = setTimeout(update, 1000); // 强制持续循环
         }
 
         function newPiece() {
-            const randomIndex = Math.floor(Math.random() * SHAPES.length);
-            current = {
-                shape: SHAPES[randomIndex].shape,
-                color: SHAPES[randomIndex].color
-            };
-            x = Math.floor(COLS/2) - Math.floor(current.shape[0].length/2);
+            const { shape, color } = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+            current = { shape, color };
+            x = Math.floor(COLS/2) - Math.floor(shape[0].length/2);
             y = 0;
-            
             if (collision()) {
                 clearTimeout(gameLoop);
                 alert('游戏结束！分数: ' + score);
@@ -107,32 +96,101 @@
             }
         }
 
-        // 保持原有 collision(), merge(), clearLines(), draw() 函数不变
+        function collision() {
+            for (let i = 0; i < current.shape.length; i++) {
+                for (let j = 0; j < current.shape[i].length; j++) {
+                    if (current.shape[i][j]) {
+                        const newX = x + j, newY = y + i;
+                        if (newX < 0 || newX >= COLS || newY >= ROWS) return true;
+                        if (newY >= 0 && board[newY][newX]) return true;
+                    }
+                }
+            }
+            return false;
+        }
 
-        // █████████████████████ 触摸控制优化 █████████████████████
+        function merge() {
+            for (let i = 0; i < current.shape.length; i++) {
+                for (let j = 0; j < current.shape[i].length; j++) {
+                    if (current.shape[i][j]) {
+                        if (y + i < 0) return;
+                        board[y + i][x + j] = current.color;
+                    }
+                }
+            }
+            clearLines();
+            newPiece();
+        }
+
+        function clearLines() {
+            outer: for (let i = ROWS - 1; i >= 0; i--) {
+                for (let j = 0; j < COLS; j++) {
+                    if (!board[i][j]) continue outer;
+                }
+                board.splice(i, 1);
+                board.unshift(Array(COLS).fill(0));
+                score += 100;
+                document.getElementById('score').textContent = '分数: ' + score;
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制已固定的方块
+            board.forEach((row, i) => {
+                row.forEach((color, j) => {
+                    if (color) {
+                        ctx.fillStyle = color;
+                        ctx.fillRect(j * BLOCK_SIZE, i * BLOCK_SIZE, BLOCK_SIZE-1, BLOCK_SIZE-1);
+                    }
+                });
+            });
+
+            // 绘制当前方块
+            if (current) {
+                ctx.fillStyle = current.color;
+                current.shape.forEach((row, i) => {
+                    row.forEach((cell, j) => {
+                        if (cell) {
+                            ctx.fillRect(
+                                (x + j) * BLOCK_SIZE,
+                                (y + i) * BLOCK_SIZE,
+                                BLOCK_SIZE - 1,
+                                BLOCK_SIZE - 1
+                            );
+                        }
+                    });
+                });
+            }
+        }
+
+        // █████████████████████ 可靠的控制逻辑 █████████████████████
         const controls = {
-            left: () => { x--; if (collision()) x++; },
-            right: () => { x++; if (collision()) x--; },
+            left:  () => { x--; if (collision()) x++; draw(); },
+            right: () => { x++; if (collision()) x--; draw(); },
             rotate: () => {
-                const rotated = current.shape[0].map((_, i) =>
+                const rotated = current.shape[0].map((_,i) => 
                     current.shape.map(row => row[i]).reverse()
                 );
                 const oldShape = current.shape;
                 current.shape = rotated;
                 if (collision()) current.shape = oldShape;
+                draw();
             },
-            down: () => { y++; if (collision()) { y--; merge(); } }
+            down:  () => { y++; if (collision()) { y--; merge(); } draw(); }
         };
 
-        // 兼容手机和电脑的操作
-        ['touchstart', 'mousedown'].forEach(eventType => {
-            document.querySelectorAll('.btn').forEach(btn => {
-                btn.addEventListener(eventType, (e) => {
-                    e.preventDefault();
-                    const action = btn.id;
-                    if (controls[action]) controls[action]();
-                    draw();
-                }, { passive: false });
+        // 兼容所有设备的操作
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('touchstart', e => {
+                e.preventDefault();
+                controls[btn.id]();
+            });
+            btn.addEventListener('mousedown', e => {
+                e.preventDefault();
+                controls[btn.id]();
             });
         });
 
@@ -142,7 +200,7 @@
             score = 0;
             document.getElementById('score').textContent = '分数: 0';
             newPiece();
-            clearTimeout(gameLoop);
+            if (gameLoop) clearTimeout(gameLoop);
             update();
         }
 
