@@ -4,27 +4,27 @@
     <title>手机版俄罗斯方块</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        /* 保持原有样式不变 */
         body { 
             background: #333; 
             margin: 0; 
             touch-action: none;
-        }
-        #game-container {
-            position: relative;
-            width: 300px;
-            margin: 20px auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         #score {
             color: white;
             font-size: 20px;
-            text-align: center;
             padding: 10px;
         }
+        #game {
+            border: 2px solid white;
+        }
         #controls {
-            display: flex;
-            justify-content: space-between;
             margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
         }
         .btn {
             width: 60px;
@@ -42,18 +42,12 @@
 </head>
 <body>
     <div id="score">分数: 0</div>
-    <div id="game-container">
-        <canvas id="game" width="300" height="600"></canvas>
-        <div id="controls">
-            <div style="display: flex; gap: 20px;">
-                <div class="btn" id="left">←</div>
-                <div class="btn" id="right">→</div>
-            </div>
-            <div style="display: flex; gap: 20px;">
-                <div class="btn" id="rotate">↻</div>
-                <div class="btn" id="down">↓</div>
-            </div>
-        </div>
+    <canvas id="game" width="300" height="600"></canvas>
+    <div id="controls">
+        <div class="btn" id="left">←</div>
+        <div class="btn" id="rotate">↻</div>
+        <div class="btn" id="right">→</div>
+        <div class="btn" id="down" style="grid-column: 2;">↓</div>
     </div>
 
     <script>
@@ -63,96 +57,160 @@
         const BLOCK_SIZE = 30;
         const COLS = 10, ROWS = 20;
         let score = 0;
+        let gameLoop; // 用于保存游戏循环句柄
 
         // 方块定义
         const SHAPES = [
-            { shape: [[1,1,1,1]], color: '#00f0f0' },
-            { shape: [[1,1,1],[0,1,0]], color: '#f0f000' },
-            { shape: [[1,1,1],[1,0,0]], color: '#f0a000' },
-            { shape: [[1,1,1],[0,0,1]], color: '#0000f0' },
-            { shape: [[1,1],[1,1]], color: '#f0f000' },
-            { shape: [[1,1,0],[0,1,1]], color: '#00f000' },
-            { shape: [[0,1,1],[1,1,0]], color: '#f00000' }
+            { shape: [[1,1,1,1]], color: '#00f0f0' }, // I
+            { shape: [[1,1,1],[0,1,0]], color: '#f0f000' }, // T
+            { shape: [[1,1,1],[1,0,0]], color: '#f0a000' }, // L
+            { shape: [[1,1,1],[0,0,1]], color: '#0000f0' }, // J
+            { shape: [[1,1],[1,1]], color: '#f0f000' }, // O
+            { shape: [[1,1,0],[0,1,1]], color: '#00f000' }, // S
+            { shape: [[0,1,1],[1,1,0]], color: '#f00000' }  // Z
         ];
 
         let board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
         let current = null, x = 0, y = 0;
 
-        // █████████████████████ 修复重点 █████████████████████
+        // █████████████████████ 修复重点：确保游戏循环持续运行 █████████████████████
         function update() {
-            y++; // 核心下落逻辑
+            y++;
             if (collision()) {
                 y--;
                 merge();
             }
             draw();
-            setTimeout(update, 1000); // 必须保留这个循环调用
+            gameLoop = setTimeout(update, 1000); // 关键修复：保存循环句柄
         }
 
         function newPiece() {
-            const { shape, color } = SHAPES[Math.floor(Math.random() * SHAPES.length)];
-            current = { shape, color };
-            x = Math.floor(COLS/2) - Math.floor(shape[0].length/2);
+            const randomIndex = Math.floor(Math.random() * SHAPES.length);
+            current = {
+                shape: SHAPES[randomIndex].shape,
+                color: SHAPES[randomIndex].color
+            };
+            x = Math.floor(COLS/2) - Math.floor(current.shape[0].length/2);
             y = 0;
+            
             if (collision()) {
+                clearTimeout(gameLoop); // 停止游戏循环
                 alert('游戏结束！分数: ' + score);
                 resetGame();
             }
         }
 
-        // 保持原有 collision(), merge(), clearLines(), draw() 函数不变
-
-        // █████████████████████ 触摸控制 █████████████████████
-        const leftBtn = document.getElementById('left');
-        const rightBtn = document.getElementById('right');
-        const rotateBtn = document.getElementById('rotate');
-        const downBtn = document.getElementById('down');
-
-        // 修复触摸事件：添加 event.preventDefault()
-        function addButtonControl(element, action) {
-            element.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                handleAction(action);
-            }, { passive: false }); // 重要：禁用被动事件监听
-        }
-
-        function handleAction(action) {
-            if (!current) return;
-            switch(action) {
-                case 'left': x--; if (collision()) x++; break;
-                case 'right': x++; if (collision()) x--; break;
-                case 'rotate':
-                    const rotated = current.shape[0].map((_, i) =>
-                        current.shape.map(row => row[i]).reverse()
-                    );
-                    const oldShape = current.shape;
-                    current.shape = rotated;
-                    if (collision()) current.shape = oldShape;
-                    break;
-                case 'down': 
-                    y++;
-                    if (collision()) { y--; merge(); }
-                    break;
+        function collision() {
+            for (let i = 0; i < current.shape.length; i++) {
+                for (let j = 0; j < current.shape[i].length; j++) {
+                    if (current.shape[i][j]) {
+                        const newX = x + j;
+                        const newY = y + i;
+                        if (newX < 0 || newX >= COLS || newY >= ROWS) return true;
+                        if (newY >= 0 && board[newY][newX]) return true;
+                    }
+                }
             }
-            draw();
+            return false;
         }
 
-        // 绑定按钮
-        addButtonControl(leftBtn, 'left');
-        addButtonControl(rightBtn, 'right');
-        addButtonControl(rotateBtn, 'rotate');
-        addButtonControl(downBtn, 'down');
+        function merge() {
+            for (let i = 0; i < current.shape.length; i++) {
+                for (let j = 0; j < current.shape[i].length; j++) {
+                    if (current.shape[i][j]) {
+                        if (y + i < 0) return;
+                        board[y + i][x + j] = current.color;
+                    }
+                }
+            }
+            clearLines();
+            newPiece();
+        }
 
-        // █████████████████████ 启动游戏 █████████████████████
+        function clearLines() {
+            outer: for (let i = ROWS - 1; i >= 0; i--) {
+                for (let j = 0; j < COLS; j++) {
+                    if (!board[i][j]) continue outer;
+                }
+                board.splice(i, 1);
+                board.unshift(Array(COLS).fill(0));
+                score += 100;
+                document.getElementById('score').textContent = '分数: ' + score;
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制已固定的方块
+            board.forEach((row, i) => {
+                row.forEach((color, j) => {
+                    if (color) {
+                        ctx.fillStyle = color;
+                        ctx.fillRect(j * BLOCK_SIZE, i * BLOCK_SIZE, BLOCK_SIZE-1, BLOCK_SIZE-1);
+                    }
+                });
+            });
+
+            // 绘制当前方块
+            if (current) {
+                ctx.fillStyle = current.color;
+                current.shape.forEach((row, i) => {
+                    row.forEach((cell, j) => {
+                        if (cell) {
+                            ctx.fillRect(
+                                (x + j) * BLOCK_SIZE,
+                                (y + i) * BLOCK_SIZE,
+                                BLOCK_SIZE - 1,
+                                BLOCK_SIZE - 1
+                            );
+                        }
+                    });
+                });
+            }
+        }
+
+        // █████████████████████ 触摸控制优化 █████████████████████
+        const controls = {
+            left: () => { x--; if (collision()) x++; },
+            right: () => { x++; if (collision()) x--; },
+            rotate: () => {
+                const rotated = current.shape[0].map((_, i) =>
+                    current.shape.map(row => row[i]).reverse()
+                );
+                const oldShape = current.shape;
+                current.shape = rotated;
+                if (collision()) current.shape = oldShape;
+            },
+            down: () => { y++; if (collision()) { y--; merge(); } }
+        };
+
+        // 兼容手机和电脑的操作
+        ['touchstart', 'mousedown'].forEach(eventType => {
+            document.querySelectorAll('.btn').forEach(btn => {
+                btn.addEventListener(eventType, (e) => {
+                    e.preventDefault();
+                    const action = btn.id;
+                    if (controls[action]) controls[action]();
+                    draw();
+                }, { passive: false });
+            });
+        });
+
+        // █████████████████████ 游戏初始化 █████████████████████
         function resetGame() {
             board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
             score = 0;
             document.getElementById('score').textContent = '分数: 0';
             newPiece();
+            clearTimeout(gameLoop);
+            update(); // 确保重新启动游戏循环
         }
 
+        // 启动游戏
         newPiece();
-        update(); // 确保启动游戏循环
+        update();
     </script>
 </body>
 </html>
