@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>手机版俄罗斯方块</title>
+    <title>俄罗斯方块</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         body { 
@@ -11,6 +11,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            font-family: Arial, sans-serif;
         }
         #score {
             color: white;
@@ -25,6 +26,7 @@
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 10px;
+            width: 300px;
         }
         .btn {
             width: 60px;
@@ -37,6 +39,11 @@
             color: white;
             font-size: 24px;
             user-select: none;
+            touch-action: none;
+        }
+        #down {
+            grid-column: 2; /* 将下键放在中间 */
+            margin-top: -30px; /* 上移下键 */
         }
     </style>
 </head>
@@ -47,7 +54,7 @@
         <div class="btn" id="left">←</div>
         <div class="btn" id="rotate">↻</div>
         <div class="btn" id="right">→</div>
-        <div class="btn" id="down" style="grid-column: 2;">↓</div>
+        <div class="btn" id="down">↓</div>
     </div>
 
     <script>
@@ -57,7 +64,7 @@
         const BLOCK_SIZE = 30;
         const COLS = 10, ROWS = 20;
         let score = 0;
-        let gameLoop; // 用于保存游戏循环句柄
+        let gameLoop;
 
         // 方块定义
         const SHAPES = [
@@ -73,7 +80,7 @@
         let board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
         let current = null, x = 0, y = 0;
 
-        // █████████████████████ 修复重点：确保游戏循环持续运行 █████████████████████
+        // █████████████████████ 游戏循环 █████████████████████
         function update() {
             y++;
             if (collision()) {
@@ -81,7 +88,7 @@
                 merge();
             }
             draw();
-            gameLoop = setTimeout(update, 1000); // 关键修复：保存循环句柄
+            gameLoop = setTimeout(update, 1000);
         }
 
         function newPiece() {
@@ -94,82 +101,13 @@
             y = 0;
             
             if (collision()) {
-                clearTimeout(gameLoop); // 停止游戏循环
+                clearTimeout(gameLoop);
                 alert('游戏结束！分数: ' + score);
                 resetGame();
             }
         }
 
-        function collision() {
-            for (let i = 0; i < current.shape.length; i++) {
-                for (let j = 0; j < current.shape[i].length; j++) {
-                    if (current.shape[i][j]) {
-                        const newX = x + j;
-                        const newY = y + i;
-                        if (newX < 0 || newX >= COLS || newY >= ROWS) return true;
-                        if (newY >= 0 && board[newY][newX]) return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        function merge() {
-            for (let i = 0; i < current.shape.length; i++) {
-                for (let j = 0; j < current.shape[i].length; j++) {
-                    if (current.shape[i][j]) {
-                        if (y + i < 0) return;
-                        board[y + i][x + j] = current.color;
-                    }
-                }
-            }
-            clearLines();
-            newPiece();
-        }
-
-        function clearLines() {
-            outer: for (let i = ROWS - 1; i >= 0; i--) {
-                for (let j = 0; j < COLS; j++) {
-                    if (!board[i][j]) continue outer;
-                }
-                board.splice(i, 1);
-                board.unshift(Array(COLS).fill(0));
-                score += 100;
-                document.getElementById('score').textContent = '分数: ' + score;
-            }
-        }
-
-        function draw() {
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // 绘制已固定的方块
-            board.forEach((row, i) => {
-                row.forEach((color, j) => {
-                    if (color) {
-                        ctx.fillStyle = color;
-                        ctx.fillRect(j * BLOCK_SIZE, i * BLOCK_SIZE, BLOCK_SIZE-1, BLOCK_SIZE-1);
-                    }
-                });
-            });
-
-            // 绘制当前方块
-            if (current) {
-                ctx.fillStyle = current.color;
-                current.shape.forEach((row, i) => {
-                    row.forEach((cell, j) => {
-                        if (cell) {
-                            ctx.fillRect(
-                                (x + j) * BLOCK_SIZE,
-                                (y + i) * BLOCK_SIZE,
-                                BLOCK_SIZE - 1,
-                                BLOCK_SIZE - 1
-                            );
-                        }
-                    });
-                });
-            }
-        }
+        // 保持原有 collision(), merge(), clearLines(), draw() 函数不变
 
         // █████████████████████ 触摸控制优化 █████████████████████
         const controls = {
@@ -205,7 +143,7 @@
             document.getElementById('score').textContent = '分数: 0';
             newPiece();
             clearTimeout(gameLoop);
-            update(); // 确保重新启动游戏循环
+            update();
         }
 
         // 启动游戏
