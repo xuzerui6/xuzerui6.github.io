@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>简单俄罗斯方块</title>
+</head>
+<body>
+    <canvas id="game" width="300" height="600"></canvas>
+    <script>
+        // 获取画布
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        
+        // 方块大小和行列数
+        const BLOCK_SIZE = 30;
+        const COLS = 10, ROWS = 20;
+        
+        // 七种方块形状
+        const SHAPES = [
+            [[1,1,1,1]], // I型
+            [[1,1,1],[0,1,0]], // T型
+            [[1,1,1],[1,0,0]], // L型
+            [[1,1,1],[0,0,1]], // J型
+            [[1,1],[1,1]],      // O型
+            [[1,1,0],[0,1,1]], // S型
+            [[0,1,1],[1,1,0]]  // Z型
+        ];
+        
+        // 当前方块
+        let currentShape;
+        let x = 0, y = 0;
+        
+        // 生成随机方块
+        function newShape() {
+            currentShape = SHAPES[Math.floor(Math.random()*SHAPES.length)];
+            x = COLS/2 - Math.ceil(currentShape[0].length/2);
+            y = 0;
+        }
+        
+        // 绘制游戏
+        function draw() {
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制当前方块
+            ctx.fillStyle = "#f00";
+            for(let i=0; i<currentShape.length; i++) {
+                for(let j=0; j<currentShape[i].length; j++) {
+                    if(currentShape[i][j]) {
+                        ctx.fillRect((x+j)*BLOCK_SIZE, (y+i)*BLOCK_SIZE, BLOCK_SIZE-1, BLOCK_SIZE-1);
+                    }
+                }
+            }
+        }
+        
+        // 游戏循环
+        function update() {
+            y++; // 方块下落
+            if(y > ROWS - currentShape.length) {
+                y = 0;
+                newShape();
+            }
+            draw();
+            setTimeout(update, 1000);
+        }
+        
+        // 启动游戏
+        newShape();
+        update();
+    </script>
+</body>
+</html>
